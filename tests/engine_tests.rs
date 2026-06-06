@@ -60,9 +60,7 @@ fn stereo_output_is_balanced() {
 
 #[test]
 fn wav_roundtrip_preserves_length() {
-    let frames: Vec<f32> = (0..1000)
-        .map(|i| (i as f32 * 0.05).sin() * 0.5)
-        .collect();
+    let frames: Vec<f32> = (0..1000).map(|i| (i as f32 * 0.05).sin() * 0.5).collect();
     let sample = Sample::new(frames.clone(), 44_100);
 
     let dir = std::env::temp_dir();
@@ -157,5 +155,8 @@ fn app_records_live_hits_into_pattern() {
         },
         &mut engine,
     );
-    assert!(engine.sequencer.pattern.is_on(2, engine.sequencer.current_step));
+    assert!(engine
+        .sequencer
+        .pattern
+        .is_on(2, engine.sequencer.current_step));
 }

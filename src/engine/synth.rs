@@ -147,21 +147,21 @@ fn tone(sr: u32, note: u8) -> Sample {
 /// Build the default 16-pad kit (logical pad order, index 0 = bottom-left).
 pub fn default_kit(sr: u32) -> Vec<Sample> {
     vec![
-        kick(sr),          // 0
-        snare(sr),         // 1
-        hat(sr, false),    // 2 closed hat
-        hat(sr, true),     // 3 open hat
-        clap(sr),          // 4
-        rim(sr),           // 5
-        tom(sr, 100.0),    // 6 low tom
-        tom(sr, 160.0),    // 7 mid tom
-        cowbell(sr),       // 8
-        tone(sr, 48),      // 9  C2
-        tone(sr, 50),      // 10 D2
-        tone(sr, 52),      // 11 E2
-        tone(sr, 55),      // 12 G2
-        tone(sr, 57),      // 13 A2
-        tone(sr, 60),      // 14 C3
-        tone(sr, 64),      // 15 E3
+        kick(sr),       // 0
+        snare(sr),      // 1
+        hat(sr, false), // 2 closed hat
+        hat(sr, true),  // 3 open hat
+        clap(sr),       // 4
+        rim(sr),        // 5
+        tom(sr, 100.0), // 6 low tom
+        tom(sr, 160.0), // 7 mid tom
+        cowbell(sr),    // 8
+        tone(sr, 48),   // 9  C2
+        tone(sr, 50),   // 10 D2
+        tone(sr, 52),   // 11 E2
+        tone(sr, 55),   // 12 G2
+        tone(sr, 57),   // 13 A2
+        tone(sr, 60),   // 14 C3
+        tone(sr, 64),   // 15 E3
     ]
 }

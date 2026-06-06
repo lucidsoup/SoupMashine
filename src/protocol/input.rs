@@ -24,9 +24,9 @@ pub enum InputEvent {
 /// relative encoder deltas.
 #[derive(Debug)]
 pub struct InputParser {
-    buttons: u64,                // bitset of the 48 buttons
-    main_encoder: u8,            // 0x0..0x0F
-    encoders: [u16; 8],          // raw 16-bit display-encoder values
+    buttons: u64,                  // bitset of the 48 buttons
+    main_encoder: u8,              // 0x0..0x0F
+    encoders: [u16; 8],            // raw 16-bit display-encoder values
     pad_pressure: [u16; NUM_PADS], // last pressure per logical pad
     pad_down: [bool; NUM_PADS],
     initialized: bool,

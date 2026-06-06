@@ -80,9 +80,7 @@ impl LedState {
         buf[0] = BUTTON_LED_REPORT_ID;
         // Only the first 32 button LEDs are addressable here. (VERIFY mapping.)
         let n = BUTTON_LED_DATA_LEN.min(NUM_BUTTONS);
-        for i in 0..n {
-            buf[1 + i] = self.buttons[i];
-        }
+        buf[1..1 + n].copy_from_slice(&self.buttons[..n]);
         buf
     }
 }

@@ -5,9 +5,10 @@ use soupmashine::protocol::{Button, Color, Framebuffer, InputEvent, InputParser,
 fn pad_report_decodes_press_with_velocity() {
     let mut parser = InputParser::new();
     // Pad at report position 0 (physical pad 13 => logical 12), pressure 800.
+    let pos: u16 = 0;
     let pressure: u16 = 800;
     let low = (pressure & 0xFF) as u8;
-    let high = ((0u16 << 4) | ((pressure >> 8) & 0x0F)) as u8;
+    let high = ((pos << 4) | ((pressure >> 8) & 0x0F)) as u8;
     let report = [device::INPUT_REPORT_PADS, low, high];
 
     let events = parser.parse(&report);

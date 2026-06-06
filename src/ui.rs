@@ -7,22 +7,22 @@ use crate::protocol::{Button, Color, Framebuffer, LedState};
 
 /// Fixed per-pad color palette.
 pub const PAD_PALETTE: [Color; NUM_PADS] = [
-    Color::new(255, 40, 40),  // kick
-    Color::new(255, 140, 0),  // snare
-    Color::new(255, 220, 0),  // closed hat
-    Color::new(180, 255, 0),  // open hat
-    Color::new(0, 255, 80),   // clap
-    Color::new(0, 255, 200),  // rim
-    Color::new(0, 200, 255),  // low tom
-    Color::new(0, 120, 255),  // mid tom
-    Color::new(80, 60, 255),  // cowbell
-    Color::new(160, 0, 255),  // tone
-    Color::new(220, 0, 220),  // tone
-    Color::new(255, 0, 140),  // tone
-    Color::new(255, 60, 120), // tone
-    Color::new(120, 255, 120),// tone
-    Color::new(120, 200, 255),// tone
-    Color::new(220, 220, 220),// tone
+    Color::new(255, 40, 40),   // kick
+    Color::new(255, 140, 0),   // snare
+    Color::new(255, 220, 0),   // closed hat
+    Color::new(180, 255, 0),   // open hat
+    Color::new(0, 255, 80),    // clap
+    Color::new(0, 255, 200),   // rim
+    Color::new(0, 200, 255),   // low tom
+    Color::new(0, 120, 255),   // mid tom
+    Color::new(80, 60, 255),   // cowbell
+    Color::new(160, 0, 255),   // tone
+    Color::new(220, 0, 220),   // tone
+    Color::new(255, 0, 140),   // tone
+    Color::new(255, 60, 120),  // tone
+    Color::new(120, 255, 120), // tone
+    Color::new(120, 200, 255), // tone
+    Color::new(220, 220, 220), // tone
 ];
 
 /// Build the full LED state for the current frame.
@@ -32,14 +32,14 @@ pub fn build_leds(app: &App, engine: &Engine) -> LedState {
 
     match app.mode {
         PadMode::Play => {
-            for pad in 0..NUM_PADS {
-                let mut c = PAD_PALETTE[pad].dim(0.18);
+            for (pad, &color) in PAD_PALETTE.iter().enumerate() {
+                let mut c = color.dim(0.18);
                 if pad == app.active_track {
-                    c = PAD_PALETTE[pad].dim(0.6);
+                    c = color.dim(0.6);
                 }
                 // Flash pads that fire on the current step while playing.
                 if seq.playing && seq.pattern.is_on(pad, seq.current_step) {
-                    c = PAD_PALETTE[pad];
+                    c = color;
                 }
                 leds.pads[pad] = c;
             }
@@ -112,18 +112,8 @@ fn build_left(app: &App, engine: &Engine) -> Framebuffer {
         PadMode::Step => "MODE STEP",
     };
     fb.draw_text(mode, 2, 50, 1);
-    fb.draw_text(
-        &format!("TRK {:>2}", app.active_track + 1),
-        120,
-        50,
-        1,
-    );
-    fb.draw_text(
-        &format!("STEP {:>2}", seq.current_step + 1),
-        180,
-        50,
-        1,
-    );
+    fb.draw_text(&format!("TRK {:>2}", app.active_track + 1), 120, 50, 1);
+    fb.draw_text(&format!("STEP {:>2}", seq.current_step + 1), 180, 50, 1);
     fb
 }
 
