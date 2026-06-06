@@ -270,6 +270,87 @@ impl HidTransport {
         };
         res.map(|_| ()).map_err(to_io)
     }
+
+    /// Poll *every* IN endpoint on the device and print each report in hex,
+    /// labeled with the interface and endpoint it came from. Consecutive
+    /// identical reports per endpoint are collapsed so held pads don't flood.
+    /// Runs until Ctrl-C. Used to discover where buttons/encoders are reported.
+    pub fn monitor_raw() -> io::Result<()> {
+        let context = Context::new().map_err(to_io)?;
+        let dev = find_device(&context)?;
+        let config = dev.active_config_descriptor().map_err(to_io)?;
+
+        // (interface, endpoint address, is_interrupt)
+        let mut ins: Vec<(u8, u8, bool)> = Vec::new();
+        for iface in config.interfaces() {
+            for desc in iface.descriptors() {
+                for ep in desc.endpoint_descriptors() {
+                    if ep.direction() == Direction::In {
+                        ins.push((
+                            desc.interface_number(),
+                            ep.address(),
+                            ep.transfer_type() == TransferType::Interrupt,
+                        ));
+                    }
+                }
+            }
+        }
+        if ins.is_empty() {
+            return Err(io::Error::new(
+                io::ErrorKind::NotFound,
+                "device has no IN endpoints",
+            ));
+        }
+
+        let handle = dev.open().map_err(to_io)?;
+        #[cfg(target_os = "linux")]
+        {
+            let _ = handle.set_auto_detach_kernel_driver(true);
+        }
+        let mut claimed: Vec<u8> = Vec::new();
+        for (iface, _, _) in &ins {
+            if !claimed.contains(iface) && handle.claim_interface(*iface).is_ok() {
+                claimed.push(*iface);
+            }
+        }
+
+        println!("Listening on IN endpoints:");
+        for (iface, ep, is_int) in &ins {
+            let kind = if *is_int { "interrupt" } else { "bulk" };
+            println!("  interface {iface}, endpoint {ep:#04x} ({kind})");
+        }
+        println!("\nPress buttons/encoders; Ctrl-C to stop.\n");
+
+        let mut buf = [0u8; 64];
+        let mut last: Vec<(u8, u8, Vec<u8>)> = Vec::new();
+        let timeout = Duration::from_millis(5);
+
+        loop {
+            for (iface, ep, is_int) in &ins {
+                let res = if *is_int {
+                    handle.read_interrupt(*ep, &mut buf, timeout)
+                } else {
+                    handle.read_bulk(*ep, &mut buf, timeout)
+                };
+                let n = match res {
+                    Ok(n) if n > 0 => n,
+                    _ => continue, // timeout / empty / endpoint error
+                };
+                let report = &buf[..n];
+
+                // Collapse consecutive identical reports per endpoint.
+                let slot = last.iter_mut().find(|(i, e, _)| i == iface && e == ep);
+                match slot {
+                    Some((_, _, prev)) if prev.as_slice() == report => continue,
+                    Some((_, _, prev)) => *prev = report.to_vec(),
+                    None => last.push((*iface, *ep, report.to_vec())),
+                }
+
+                let hex: Vec<String> = report.iter().map(|b| format!("{b:02x}")).collect();
+                println!("iface {iface} ep {ep:#04x} [{n:2}]  {}", hex.join(" "));
+            }
+        }
+    }
 }
 
 impl Drop for HidTransport {
