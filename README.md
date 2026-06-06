@@ -127,6 +127,31 @@ centralized in `protocol/`): the exact button bit positions, the button/group
 LED byte offsets, and the display chunk-header `chunk` field semantics. Pad
 input/LED layout and display geometry are confirmed.
 
+## Troubleshooting
+
+**The MK2 stays on the Native Instruments boot/splash screen.** The controller
+shows its logo until the host claims the right USB interface and sends it data —
+no handshake is required. The MK2 is a *composite* device (control + USB audio +
+MIDI), so the control endpoints are **not** on interface 0. SoupMashine
+auto-detects the interface that owns endpoints `0x84`/`0x01`/`0x08`; if the
+splash persists, inspect the device and confirm what was detected:
+
+```bash
+soupmashine --list            # or: cargo run --features hardware -- --list
+```
+
+This prints every NI USB device, all interfaces/endpoints (marking the control
+endpoints), and the interface SoupMashine will claim. If detection looks wrong
+you can force it:
+
+```bash
+soupmashine --interface 3     # claim a specific interface number
+```
+
+On Linux a "could not open / claim" error is almost always permissions — install
+the udev rule (`deploy/install.sh`) or run once with `sudo` to confirm. Paste the
+`--list` output into an issue and the protocol constants can be corrected.
+
 ## License
 
 MIT

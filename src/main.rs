@@ -44,7 +44,27 @@ fn main() {
     demo_pattern(&mut engine.sequencer.pattern);
 
     #[cfg(feature = "hardware")]
-    run_with_hardware(engine);
+    {
+        let args: Vec<String> = std::env::args().collect();
+
+        // `--list` / `--list-usb`: dump USB descriptors and exit.
+        if args.iter().any(|a| a == "--list" || a == "--list-usb") {
+            match soupmashine::transport::HidTransport::describe() {
+                Ok(report) => print!("{report}"),
+                Err(e) => eprintln!("USB enumeration failed: {e}"),
+            }
+            return;
+        }
+
+        // `--interface N`: override the auto-detected control interface.
+        let forced_iface = args
+            .iter()
+            .position(|a| a == "--interface")
+            .and_then(|i| args.get(i + 1))
+            .and_then(|v| v.parse::<u8>().ok());
+
+        run_with_hardware(engine, forced_iface);
+    }
 
     #[cfg(not(feature = "hardware"))]
     run_headless(engine);
@@ -112,18 +132,30 @@ fn fmt_bpm(engine: &Engine) -> String {
 // ---------------------------------------------------------------------------
 
 #[cfg(feature = "hardware")]
-fn run_with_hardware(engine: Engine) {
+fn run_with_hardware(engine: Engine, forced_iface: Option<u8>) {
     use std::sync::{Arc, Mutex};
     use std::time::{Duration, Instant};
 
-    let mut transport = match HidTransport::open() {
+    let opened = match forced_iface {
+        Some(n) => {
+            println!("Opening Maschine MK2 (forced interface {n})...");
+            HidTransport::open_interface(n)
+        }
+        None => HidTransport::open(),
+    };
+
+    let mut transport = match opened {
         Ok(t) => {
-            println!("Connected to Maschine MK2.");
+            println!("Connected to Maschine MK2. Clearing splash screen...");
             t
         }
         Err(e) => {
             eprintln!("Could not open Maschine MK2: {e}");
-            eprintln!("Is it plugged in? On Linux you may need udev permissions or sudo.");
+            // Show what is actually on the bus to help diagnose.
+            if let Ok(report) = HidTransport::describe() {
+                eprintln!("\nUSB devices seen:\n{report}");
+            }
+            eprintln!("Tip: run `soupmashine --list` to inspect, or try `--interface N`.");
             return;
         }
     };
