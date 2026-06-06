@@ -56,6 +56,12 @@ fn main() {
             return;
         }
 
+        // `--monitor`: print raw input reports as you press things (for mapping).
+        if args.iter().any(|a| a == "--monitor") {
+            run_monitor();
+            return;
+        }
+
         // `--interface N`: override the auto-detected control interface.
         let forced_iface = args
             .iter()
@@ -130,6 +136,49 @@ fn fmt_bpm(engine: &Engine) -> String {
 // ---------------------------------------------------------------------------
 // Hardware (real Maschine MK2)
 // ---------------------------------------------------------------------------
+
+/// Print raw input reports (and the events we currently decode) as the user
+/// presses pads/buttons/encoders. Consecutive identical reports are collapsed so
+/// held pads don't flood the output. Used to map buttons against real hardware.
+#[cfg(feature = "hardware")]
+fn run_monitor() {
+    let mut transport = match HidTransport::open() {
+        Ok(t) => t,
+        Err(e) => {
+            eprintln!("Could not open Maschine MK2: {e}");
+            return;
+        }
+    };
+    println!("Monitoring input. Press buttons/encoders; Ctrl-C to stop.");
+    println!("(Each line: report bytes in hex, then any decoded events.)\n");
+
+    let mut parser = InputParser::new();
+    let mut buf = [0u8; 64];
+    let mut last: Vec<u8> = Vec::new();
+
+    loop {
+        match transport.read_input(&mut buf, 200) {
+            Ok(0) => {}
+            Ok(n) => {
+                let report = &buf[..n];
+                if report == last.as_slice() {
+                    continue; // collapse repeats (e.g. steady pad pressure)
+                }
+                last = report.to_vec();
+
+                let hex: Vec<String> = report.iter().map(|b| format!("{b:02x}")).collect();
+                println!("[{:2}] {}", n, hex.join(" "));
+                for ev in parser.parse(report) {
+                    println!("       -> {ev:?}");
+                }
+            }
+            Err(e) => {
+                eprintln!("read error: {e}");
+                break;
+            }
+        }
+    }
+}
 
 #[cfg(feature = "hardware")]
 fn run_with_hardware(engine: Engine, forced_iface: Option<u8>) {
