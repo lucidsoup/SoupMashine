@@ -1,0 +1,31 @@
+[package]
+name = "soupmashine"
+version = "0.1.0"
+edition = "2021"
+description = "Standalone groovebox firmware for the Native Instruments Maschine MK2"
+license = "MIT"
+authors = ["SoupMashine contributors"]
+readme = "README.md"
+
+[[bin]]
+name = "soupmashine"
+path = "src/main.rs"
+
+[features]
+# Default build is pure-Rust with no system dependencies, so it compiles and
+# tests anywhere (CI, a fresh Raspberry Pi, this sandbox). Real hardware and
+# real audio output are opt-in because they pull in libusb / ALSA.
+default = []
+hardware = ["dep:rusb"]   # talk to the physical Maschine MK2 over USB
+audio = ["dep:cpal"]      # stream the engine to a real audio device
+full = ["hardware", "audio"]
+
+[dependencies]
+rusb = { version = "0.9", optional = true }
+cpal = { version = "0.15", optional = true }
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+panic = "abort"
