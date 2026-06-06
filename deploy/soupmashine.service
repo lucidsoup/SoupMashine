@@ -1,0 +1,20 @@
+[Unit]
+Description=SoupMashine - standalone Maschine MK2 groovebox
+# Wait for the USB controller and sound system to be ready.
+After=sound.target
+Wants=sound.target
+
+[Service]
+Type=simple
+# Adjust User/paths to match your install (see deploy/install.sh).
+User=pi
+ExecStart=/opt/soupmashine/soupmashine
+Restart=on-failure
+RestartSec=2
+# Real-time-ish audio scheduling; harmless if the kernel disallows it.
+LimitRTPRIO=95
+LimitMEMLOCK=infinity
+Nice=-10
+
+[Install]
+WantedBy=multi-user.target

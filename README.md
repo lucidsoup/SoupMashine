@@ -78,9 +78,20 @@ Right display: the active track's step grid with a moving playhead.
 
 ## Running on a Raspberry Pi
 
+One-shot install (builds the `full` binary, adds the udev rule, and installs a
+systemd service that auto-starts at boot):
+
+```bash
+curl https://sh.rustup.rs -sSf | sh        # if Rust isn't installed
+sudo ./deploy/install.sh
+sudo systemctl start soupmashine           # plug in the MK2 first
+journalctl -u soupmashine -f               # watch the logs
+```
+
+Or do it by hand:
+
 ```bash
 sudo apt install build-essential libasound2-dev libudev-dev pkg-config
-curl https://sh.rustup.rs -sSf | sh        # if Rust isn't installed
 cargo build --release --features full
 
 # Let non-root users talk to the device (VID 17cc):
@@ -88,10 +99,11 @@ echo 'SUBSYSTEM=="usb", ATTR{idVendor}=="17cc", MODE="0666"' \
   | sudo tee /etc/udev/rules.d/50-maschine.rules
 sudo udevadm control --reload-rules && sudo udevadm trigger
 
-./target/release/soupmashine          # plug in the MK2 first
+./target/release/soupmashine
 ```
 
-To launch on boot, point a small systemd unit at the release binary.
+The systemd unit lives in [`deploy/soupmashine.service`](deploy/soupmashine.service);
+adjust `User=` and paths there if you don't install to `/opt/soupmashine`.
 
 ## Protocol reference
 
