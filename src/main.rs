@@ -197,12 +197,20 @@ fn run_with_hardware(engine: Engine, forced_iface: Option<u8>) {
     #[cfg(not(feature = "audio"))]
     let mut last_tick = Instant::now();
 
+    let debug_input = std::env::var("SOUPMASHINE_DEBUG").is_ok();
     println!("Running. PLAY = transport, REC = record, GRID = step mode.");
+    if debug_input {
+        println!("(debug: printing raw non-pad input reports)");
+    }
 
     loop {
         // 1. Read and dispatch hardware input.
         let n = transport.read_input(&mut buf, 4).unwrap_or(0);
         if n > 0 {
+            if debug_input && buf.first() != Some(&0x20) {
+                let hex: Vec<String> = buf[..n].iter().map(|b| format!("{b:02x}")).collect();
+                println!("IN [{n:2}] {}", hex.join(" "));
+            }
             let events = parser.parse(&buf[..n]);
             if !events.is_empty() {
                 let mut eng = engine.lock().unwrap();
