@@ -394,7 +394,7 @@ impl HidTransport {
         // Pad-report (0x20) change detection: learn which byte indices flicker
         // on their own, then report only *new* changes (i.e. button presses).
         let mut baseline: Option<Vec<u8>> = None;
-        let mut noisy = [false; 32];
+        let mut noisy = [false; 64];
         let start = Instant::now();
         let calib = Duration::from_secs(3);
         let mut calibrated = false;
@@ -443,9 +443,10 @@ impl HidTransport {
                     continue;
                 }
 
-                // Pad report: diff against the calibrated baseline.
+                // Pad report: diff against the calibrated baseline. The full
+                // report is ~64 bytes; buttons/encoders live past the pad data.
                 if report.first() == Some(&0x20) {
-                    let frame = &report[..n.min(32)];
+                    let frame = &report[..n.min(64)];
                     match &baseline {
                         None => baseline = Some(frame.to_vec()),
                         Some(base) => {
