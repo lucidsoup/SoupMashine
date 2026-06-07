@@ -39,6 +39,31 @@ fn to_io<E: std::fmt::Display>(e: E) -> io::Error {
     io::Error::other(e.to_string())
 }
 
+/// Issue HID SET_IDLE(0) and SET_PROTOCOL(report) on an interface. This is what
+/// the kernel HID driver does on enumeration; the MK2 needs it before it will
+/// emit button/encoder reports. Errors are ignored (best effort).
+fn hid_set_idle<T: UsbContext>(handle: &DeviceHandle<T>, interface: u8) {
+    // bmRequestType = class | interface | host-to-device = 0x21
+    // SET_IDLE (0x0A): wValue = (duration<<8) | reportId = 0 (report on change)
+    let _ = handle.write_control(
+        0x21,
+        0x0A,
+        0x0000,
+        interface as u16,
+        &[],
+        Duration::from_millis(50),
+    );
+    // SET_PROTOCOL (0x0B): wValue = 1 (report protocol)
+    let _ = handle.write_control(
+        0x21,
+        0x0B,
+        0x0001,
+        interface as u16,
+        &[],
+        Duration::from_millis(50),
+    );
+}
+
 fn find_device(context: &Context) -> io::Result<Device<Context>> {
     for dev in context.devices().map_err(to_io)?.iter() {
         if let Ok(dd) = dev.device_descriptor() {
@@ -145,6 +170,11 @@ impl HidTransport {
         if ctrl.alt != 0 {
             let _ = handle.set_alternate_setting(ctrl.interface, ctrl.alt);
         }
+
+        // The kernel HID driver normally issues these; since we bypass it via
+        // libusb we must do it ourselves so the device sends button/encoder
+        // reports (not just the always-on pad stream).
+        hid_set_idle(&handle, ctrl.interface);
 
         Ok(HidTransport { handle, ctrl })
     }
@@ -336,6 +366,7 @@ impl HidTransport {
             match handle.claim_interface(*iface) {
                 Ok(()) => {
                     println!("  interface {iface}: claimed OK");
+                    hid_set_idle(&handle, *iface);
                     claimed.push(*iface);
                 }
                 Err(e) => println!("  interface {iface}: FAILED ({e})"),
