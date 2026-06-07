@@ -45,15 +45,17 @@ pub const DISPLAY_CHUNK_BYTES: usize = DISPLAY_WIDTH; // 256
 
 // ---- LED report sizes (data bytes, excluding the leading report id) ------
 
-/// Report id 0x80 + 49 data bytes (1 reserved + 16 pads * 3). (CONFIRMED size)
+// Report sizes confirmed against the open-maschine project: the report id is
+// the first byte and the totals below are the DATA bytes that follow it.
+/// Report id 0x80 + 48 data bytes (16 pads * 3 RGB) = 49 total. (CONFIRMED)
 pub const PAD_LED_REPORT_ID: u8 = 0x80;
-pub const PAD_LED_DATA_LEN: usize = 49;
-/// Report id 0x81 + 57 data bytes (8 group RGB LEDs + assorted button LEDs).
+pub const PAD_LED_DATA_LEN: usize = 48;
+/// Report id 0x81 + 56 data bytes = 57 total. (CONFIRMED size)
 pub const GROUP_LED_REPORT_ID: u8 = 0x81;
-pub const GROUP_LED_DATA_LEN: usize = 57;
-/// Report id 0x82 + 32 data bytes (monochrome button LEDs).
+pub const GROUP_LED_DATA_LEN: usize = 56;
+/// Report id 0x82 + 31 data bytes = 32 total. (CONFIRMED size)
 pub const BUTTON_LED_REPORT_ID: u8 = 0x82;
-pub const BUTTON_LED_DATA_LEN: usize = 32;
+pub const BUTTON_LED_DATA_LEN: usize = 31;
 
 // ---- Input report ids ----------------------------------------------------
 

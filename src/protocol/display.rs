@@ -120,13 +120,13 @@ impl Framebuffer {
         let mut chunks = Vec::with_capacity(DISPLAY_CHUNKS);
         for chunk in 0..DISPLAY_CHUNKS {
             let mut buf = Vec::with_capacity(9 + DISPLAY_CHUNK_BYTES);
-            // Header per cabl: {0xE0|idx, 0,0, chunkByte, 0, 0x20, 0, 0x08, 0}.
-            // chunkByte selects which page/row block is being written.
+            // Header per open-maschine: {0xE0|idx, 0,0, row, 0, 0x20, 0, 0x08, 0}
+            // where row = chunk * 8 (the starting pixel row of this 8-px page).
             buf.extend_from_slice(&[
                 0xE0 | (display_index & 0x01),
                 0x00,
                 0x00,
-                chunk as u8,
+                (chunk * 8) as u8,
                 0x00,
                 0x20,
                 0x00,

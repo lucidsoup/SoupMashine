@@ -82,7 +82,7 @@ fn pad_led_report_has_correct_layout() {
     assert_eq!(reports.pads.len(), 1 + device::PAD_LED_DATA_LEN);
 
     let pos = device::logical_to_report_pos(logical);
-    let off = 1 + 1 + pos * 3;
+    let off = 1 + pos * 3;
     assert_eq!(reports.pads[off], 255);
     assert_eq!(reports.pads[off + 1], 0);
     assert_eq!(reports.pads[off + 2], 0);

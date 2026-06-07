@@ -49,10 +49,10 @@ impl LedState {
     fn encode_pads(&self) -> Vec<u8> {
         let mut buf = vec![0u8; 1 + PAD_LED_DATA_LEN];
         buf[0] = PAD_LED_REPORT_ID;
-        // Byte 1 is reserved; RGB triplets follow in report order.
+        // RGB triplets follow immediately after the report id, in report order.
         for logical in 0..NUM_PADS {
             let pos = logical_to_report_pos(logical);
-            let off = 1 + 1 + pos * 3;
+            let off = 1 + pos * 3;
             let c = self.pads[logical];
             buf[off] = c.r;
             buf[off + 1] = c.g;
@@ -78,7 +78,7 @@ impl LedState {
     fn encode_buttons(&self) -> Vec<u8> {
         let mut buf = vec![0u8; 1 + BUTTON_LED_DATA_LEN];
         buf[0] = BUTTON_LED_REPORT_ID;
-        // Only the first 32 button LEDs are addressable here. (VERIFY mapping.)
+        // Only the first BUTTON_LED_DATA_LEN button LEDs are addressable here.
         let n = BUTTON_LED_DATA_LEN.min(NUM_BUTTONS);
         buf[1..1 + n].copy_from_slice(&self.buttons[..n]);
         buf
