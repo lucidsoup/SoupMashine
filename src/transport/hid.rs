@@ -14,9 +14,10 @@
 
 use super::Transport;
 use crate::protocol::device::*;
+use crate::protocol::LedState;
 use rusb::{Context, Device, DeviceHandle, Direction, TransferType, UsbContext};
 use std::io;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 /// A control interface with its discovered endpoints.
 #[derive(Clone, Copy, Debug)]
@@ -323,19 +324,52 @@ impl HidTransport {
             }
         }
 
-        println!("\nListening on IN endpoints (pad report 0x20 is muted):");
+        println!("\nListening on IN endpoints:");
         for (iface, ep, is_int) in &ins {
             let kind = if *is_int { "interrupt" } else { "bulk" };
             println!("  interface {iface}, endpoint {ep:#04x} ({kind})");
         }
-        println!("\nPress buttons/encoders; Ctrl-C to stop.\n");
+
+        // Keep the device in active mode by sending blank LED reports, like the
+        // real app does. Discover the OUT endpoint for that.
+        let ctrl = select_control(&dev, None).ok();
+        let blank = LedState::new().encode();
+
+        println!("\nCALIBRATING for 3 seconds — do NOT touch the controller...");
 
         let mut buf = [0u8; 512];
         let mut last: Vec<(u8, u8, Vec<u8>)> = Vec::new();
         let mut errored: Vec<(u8, u8)> = Vec::new();
         let timeout = Duration::from_millis(5);
 
+        // Pad-report (0x20) change detection: learn which byte indices flicker
+        // on their own, then report only *new* changes (i.e. button presses).
+        let mut baseline: Option<Vec<u8>> = None;
+        let mut noisy = [false; 32];
+        let start = Instant::now();
+        let calib = Duration::from_secs(3);
+        let mut calibrated = false;
+        let mut last_out = Instant::now() - Duration::from_secs(1);
+
         loop {
+            // Keepalive output so the controller reports fully.
+            if let Some(c) = &ctrl {
+                if last_out.elapsed() >= Duration::from_millis(16) {
+                    last_out = Instant::now();
+                    for rep in [&blank.pads, &blank.groups, &blank.buttons] {
+                        let _ = if c.ep_out_interrupt {
+                            handle.write_interrupt(c.ep_out, rep, Duration::from_millis(20))
+                        } else {
+                            handle.write_bulk(c.ep_out, rep, Duration::from_millis(20))
+                        };
+                    }
+                }
+            }
+            if !calibrated && start.elapsed() >= calib {
+                calibrated = true;
+                println!("READY — press buttons/encoders now (Ctrl-C to stop).\n");
+            }
+
             for (iface, ep, is_int) in &ins {
                 let res = if *is_int {
                     handle.read_interrupt(*ep, &mut buf, timeout)
@@ -346,7 +380,6 @@ impl HidTransport {
                     Ok(n) if n > 0 => n,
                     Ok(_) | Err(rusb::Error::Timeout) => continue,
                     Err(e) => {
-                        // Report a persistent read error once per endpoint.
                         if !errored.contains(&(*iface, *ep)) {
                             errored.push((*iface, *ep));
                             println!("iface {iface} ep {ep:#04x}: read error ({e})");
@@ -356,19 +389,45 @@ impl HidTransport {
                 };
                 let report = &buf[..n];
 
-                // Mute the continuously-streaming pad pressure report.
-                if report.first() == Some(&0x20) {
+                // Ignore lone framing bytes.
+                if n == 1 {
                     continue;
                 }
 
-                // Collapse consecutive identical reports per endpoint.
+                // Pad report: diff against the calibrated baseline.
+                if report.first() == Some(&0x20) {
+                    let frame = &report[..n.min(32)];
+                    match &baseline {
+                        None => baseline = Some(frame.to_vec()),
+                        Some(base) => {
+                            let len = frame.len().min(base.len());
+                            if !calibrated {
+                                for i in 0..len {
+                                    if frame[i] != base[i] {
+                                        noisy[i] = true;
+                                    }
+                                }
+                            } else {
+                                let changes: Vec<String> = (0..len)
+                                    .filter(|&i| frame[i] != base[i] && !noisy[i])
+                                    .map(|i| format!("[{i}]={:#04x}", frame[i]))
+                                    .collect();
+                                if !changes.is_empty() {
+                                    println!("PAD-REPORT changed: {}", changes.join(" "));
+                                }
+                            }
+                        }
+                    }
+                    continue;
+                }
+
+                // Any other report: collapse repeats, then print raw.
                 let slot = last.iter_mut().find(|(i, e, _)| i == iface && e == ep);
                 match slot {
                     Some((_, _, prev)) if prev.as_slice() == report => continue,
                     Some((_, _, prev)) => *prev = report.to_vec(),
                     None => last.push((*iface, *ep, report.to_vec())),
                 }
-
                 let hex: Vec<String> = report.iter().map(|b| format!("{b:02x}")).collect();
                 println!("iface {iface} ep {ep:#04x} [{n:2}]  {}", hex.join(" "));
             }
