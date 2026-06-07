@@ -178,41 +178,59 @@ impl HidTransport {
                 let _ = writeln!(out, "  note: not the Maschine MK2 PID (1140)");
             }
 
-            let config = match dev.active_config_descriptor() {
-                Ok(c) => c,
-                Err(e) => {
-                    let _ = writeln!(out, "  (no active configuration: {e})");
-                    continue;
-                }
-            };
-            for iface in config.interfaces() {
-                for desc in iface.descriptors() {
-                    let kind = match desc.class_code() {
-                        0x01 => "audio",
-                        0x03 => "HID",
-                        0xfe => "DFU/vendor",
-                        _ => "other",
-                    };
-                    let _ = writeln!(
-                        out,
-                        "  interface {} (alt {})  class={:#04x} [{}]",
-                        desc.interface_number(),
-                        desc.setting_number(),
-                        desc.class_code(),
-                        kind
-                    );
-                    for ep in desc.endpoint_descriptors() {
-                        let dir = match ep.direction() {
-                            Direction::In => "IN ",
-                            Direction::Out => "OUT",
+            let num_configs = dd.num_configurations();
+            let active = dev.active_config_descriptor().ok().map(|c| c.number());
+            let _ = writeln!(
+                out,
+                "  {num_configs} configuration(s); active = {}",
+                active.map(|n| n.to_string()).unwrap_or_else(|| "?".into())
+            );
+
+            for ci in 0..num_configs {
+                let config = match dev.config_descriptor(ci) {
+                    Ok(c) => c,
+                    Err(e) => {
+                        let _ = writeln!(out, "  config #{ci}: (unreadable: {e})");
+                        continue;
+                    }
+                };
+                let is_active = Some(config.number()) == active;
+                let _ = writeln!(
+                    out,
+                    "  configuration {}{}:",
+                    config.number(),
+                    if is_active { " (ACTIVE)" } else { "" }
+                );
+                for iface in config.interfaces() {
+                    for desc in iface.descriptors() {
+                        let kind = match desc.class_code() {
+                            0x01 => "audio",
+                            0x03 => "HID",
+                            0xfe => "DFU/vendor",
+                            0xff => "vendor-specific",
+                            _ => "other",
                         };
                         let _ = writeln!(
                             out,
-                            "      endpoint {:#04x}  {} {:?}",
-                            ep.address(),
-                            dir,
-                            ep.transfer_type()
+                            "    interface {} (alt {})  class={:#04x} [{}]",
+                            desc.interface_number(),
+                            desc.setting_number(),
+                            desc.class_code(),
+                            kind
                         );
+                        for ep in desc.endpoint_descriptors() {
+                            let dir = match ep.direction() {
+                                Direction::In => "IN ",
+                                Direction::Out => "OUT",
+                            };
+                            let _ = writeln!(
+                                out,
+                                "        endpoint {:#04x}  {} {:?}",
+                                ep.address(),
+                                dir,
+                                ep.transfer_type()
+                            );
+                        }
                     }
                 }
             }
