@@ -307,22 +307,32 @@ impl HidTransport {
         {
             let _ = handle.set_auto_detach_kernel_driver(true);
         }
+
+        println!("Claiming interfaces:");
         let mut claimed: Vec<u8> = Vec::new();
-        for (iface, _, _) in &ins {
-            if !claimed.contains(iface) && handle.claim_interface(*iface).is_ok() {
-                claimed.push(*iface);
+        let mut ifaces: Vec<u8> = ins.iter().map(|(i, _, _)| *i).collect();
+        ifaces.sort_unstable();
+        ifaces.dedup();
+        for iface in &ifaces {
+            match handle.claim_interface(*iface) {
+                Ok(()) => {
+                    println!("  interface {iface}: claimed OK");
+                    claimed.push(*iface);
+                }
+                Err(e) => println!("  interface {iface}: FAILED ({e})"),
             }
         }
 
-        println!("Listening on IN endpoints:");
+        println!("\nListening on IN endpoints (pad report 0x20 is muted):");
         for (iface, ep, is_int) in &ins {
             let kind = if *is_int { "interrupt" } else { "bulk" };
             println!("  interface {iface}, endpoint {ep:#04x} ({kind})");
         }
         println!("\nPress buttons/encoders; Ctrl-C to stop.\n");
 
-        let mut buf = [0u8; 64];
+        let mut buf = [0u8; 512];
         let mut last: Vec<(u8, u8, Vec<u8>)> = Vec::new();
+        let mut errored: Vec<(u8, u8)> = Vec::new();
         let timeout = Duration::from_millis(5);
 
         loop {
@@ -334,9 +344,22 @@ impl HidTransport {
                 };
                 let n = match res {
                     Ok(n) if n > 0 => n,
-                    _ => continue, // timeout / empty / endpoint error
+                    Ok(_) | Err(rusb::Error::Timeout) => continue,
+                    Err(e) => {
+                        // Report a persistent read error once per endpoint.
+                        if !errored.contains(&(*iface, *ep)) {
+                            errored.push((*iface, *ep));
+                            println!("iface {iface} ep {ep:#04x}: read error ({e})");
+                        }
+                        continue;
+                    }
                 };
                 let report = &buf[..n];
+
+                // Mute the continuously-streaming pad pressure report.
+                if report.first() == Some(&0x20) {
+                    continue;
+                }
 
                 // Collapse consecutive identical reports per endpoint.
                 let slot = last.iter_mut().find(|(i, e, _)| i == iface && e == ep);
