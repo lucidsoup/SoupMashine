@@ -16,12 +16,14 @@ path = "src/main.rs"
 # tests anywhere (CI, a fresh Raspberry Pi, this sandbox). Real hardware and
 # real audio output are opt-in because they pull in libusb / ALSA.
 default = []
-hardware = ["dep:rusb"]   # talk to the physical Maschine MK2 over USB
+hardware = ["dep:hidapi"]   # talk to the physical Maschine MK2 over USB HID
 audio = ["dep:cpal"]      # stream the engine to a real audio device
 full = ["hardware", "audio"]
 
 [dependencies]
-rusb = { version = "0.9", optional = true }
+# hidraw backend: goes through the kernel HID driver (like open-maschine), which
+# is what makes the MK2 emit its button/encoder reports.
+hidapi = { version = "2.6", optional = true, default-features = false, features = ["linux-static-hidraw"] }
 cpal = { version = "0.15", optional = true }
 
 [profile.release]
