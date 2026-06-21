@@ -22,6 +22,11 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
 
+      - name: Install USB system libraries (hidapi hidraw needs libudev)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libudev-dev pkg-config
+
       - name: Format
         run: cargo fmt --all --check
 
@@ -31,8 +36,8 @@ jobs:
       - name: Test (default features)
         run: cargo test --all-targets
 
-      - name: Clippy (hardware feature, libusb backend)
-        run: cargo clippy --features hardware --all-targets -- -D warnings
+      - name: Clippy (hardware + clap-host)
+        run: cargo clippy --features "hardware clap-host" --all-targets -- -D warnings
 
   full-build:
     name: build --features full

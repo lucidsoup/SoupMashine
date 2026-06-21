@@ -11,7 +11,10 @@
 //!   renders state back to the pads and displays.
 
 pub mod app;
+pub mod daw;
 pub mod engine;
+pub mod host;
+pub mod net;
 pub mod protocol;
 pub mod transport;
 pub mod ui;

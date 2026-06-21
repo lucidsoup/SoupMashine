@@ -36,8 +36,111 @@ fn demo_pattern(pat: &mut Pattern) {
     pat.set(4, 8, 90); // clap
 }
 
+/// Join a session, create a track + clip + note, and print the shared state.
+/// Demonstrates the multiplayer sync end to end against a running `serve`.
+fn run_join_demo(addr: &str, name: &str) {
+    use soupmashine::daw::{Note, Op};
+    use std::time::Duration;
+
+    println!("Joining session at {addr} as '{name}'...");
+    let mut client = match soupmashine::net::Client::connect(addr, name) {
+        Ok(c) => c,
+        Err(e) => {
+            eprintln!("could not join {addr}: {e}");
+            return;
+        }
+    };
+    std::thread::sleep(Duration::from_millis(250)); // receive welcome + snapshot
+    let me = *client.player.lock().unwrap();
+    println!("Connected as player {me:?}.");
+
+    let _ = client.submit(Op::AddTrack {
+        id: 0,
+        name: format!("{name}'s track"),
+        owner: me,
+    });
+    std::thread::sleep(Duration::from_millis(150));
+
+    if let Some(tid) = client.session().tracks.last().map(|t| t.id) {
+        let _ = client.submit(Op::AddClip {
+            track: tid,
+            id: 0,
+            start: 0.0,
+            length: 4.0,
+        });
+        std::thread::sleep(Duration::from_millis(150));
+        if let Some(cid) = client
+            .session()
+            .track(tid)
+            .and_then(|t| t.clips.last().map(|c| c.id))
+        {
+            let _ = client.submit(Op::AddNote {
+                track: tid,
+                clip: cid,
+                note: Note {
+                    pitch: 60,
+                    velocity: 100,
+                    start: 0.0,
+                    length: 1.0,
+                },
+            });
+        }
+    }
+    std::thread::sleep(Duration::from_millis(250));
+
+    let s = client.session();
+    println!(
+        "Shared session: {} bpm, {} player(s), {} track(s), rev {}",
+        s.tempo,
+        s.players.len(),
+        s.tracks.len(),
+        s.revision
+    );
+    for t in &s.tracks {
+        println!(
+            "  track {} \"{}\" owner={:?} clips={}",
+            t.id,
+            t.name,
+            t.owner,
+            t.clips.len()
+        );
+    }
+    println!("Staying connected (edits from other players appear live). Ctrl-C to leave.");
+    loop {
+        std::thread::sleep(Duration::from_secs(1));
+    }
+}
+
 fn main() {
     banner();
+
+    // Multiplayer DAW subcommands (work in every build):
+    //   soupmashine serve [addr]        host a collaborative session
+    //   soupmashine join  <addr> [name] join one and run a quick demo
+    let args: Vec<String> = std::env::args().collect();
+    match args.get(1).map(String::as_str) {
+        Some("serve") => {
+            let addr = args
+                .get(2)
+                .cloned()
+                .unwrap_or_else(|| "0.0.0.0:8421".into());
+            if let Err(e) = soupmashine::net::serve(&addr) {
+                eprintln!("server error: {e}");
+            }
+            return;
+        }
+        Some("join") => {
+            let addr = args
+                .get(2)
+                .cloned()
+                .unwrap_or_else(|| "127.0.0.1:8421".into());
+            let name = args.get(3).cloned().unwrap_or_else(|| "player".into());
+            run_join_demo(&addr, &name);
+            return;
+        }
+        _ => {}
+    }
+
     let mut engine = Engine::new(SAMPLE_RATE);
     engine.load_default_kit();
     engine.sequencer.bpm = 120.0;

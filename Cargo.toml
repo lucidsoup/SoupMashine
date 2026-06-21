@@ -1,8 +1,8 @@
 [package]
 name = "soupmashine"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
-description = "Standalone groovebox firmware for the Native Instruments Maschine MK2"
+description = "Collaborative multiplayer DAW (Ableton/Bitwig-style) with a built-in engine, plugin hosting, and Maschine MK2 control-surface support"
 license = "MIT"
 authors = ["SoupMashine contributors"]
 readme = "README.md"
@@ -13,21 +13,25 @@ path = "src/main.rs"
 
 [features]
 # Default build is pure-Rust with no system dependencies, so it compiles and
-# tests anywhere (CI, a fresh Raspberry Pi, this sandbox). Real hardware and
-# real audio output are opt-in because they pull in libusb / ALSA.
+# tests anywhere. Real hardware, audio output and plugin hosting are opt-in.
 default = []
-hardware = ["dep:hidapi"]   # talk to the physical Maschine MK2 over USB HID
-audio = ["dep:cpal"]      # stream the engine to a real audio device
-full = ["hardware", "audio"]
+hardware = ["dep:hidapi"]   # Maschine MK2 control surface over USB HID
+audio = ["dep:cpal"]        # stream the engine to a real audio device
+clap-host = ["dep:libloading"] # load CLAP audio plugins
+full = ["hardware", "audio", "clap-host"]
 
 [dependencies]
-# hidraw backend: goes through the kernel HID driver (like open-maschine), which
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+# hidraw backend goes through the kernel HID driver (like open-maschine), which
 # is what makes the MK2 emit its button/encoder reports.
 hidapi = { version = "2.6", optional = true, default-features = false, features = ["linux-static-hidraw"] }
 cpal = { version = "0.15", optional = true }
+libloading = { version = "0.8", optional = true }
 
 [profile.release]
 opt-level = 3
 lto = true
 codegen-units = 1
 panic = "abort"
+
